@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>소리의 성질 가상 실험</title>
+    <!-- 꽃가루 효과를 위한 canvas-confetti 라이브러리 추가 -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        /* 기본 설정 및 전체 레이아웃 (스크롤 방지) */
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Pretendard', 'Malgun Gothic', sans-serif; }
+        body { width: 100vw; height: 100vh; background-color: #f0f4f8; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* 헤더 */
+        header { background-color: #2c3e50; color: white; padding: 10px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.2); z-index: 10; flex-shrink: 0; height: 60px; }
+        header h1 { font-size: 1.3rem; margin: 0; }
+        .reset-btn { background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; cursor: pointer; transition: background 0.2s; }
+        .reset-btn:hover { background: #c0392b; }
+
+        /* 메인 컨테이너 */
+        main { display: flex; flex-grow: 1; padding: 10px; gap: 10px; height: calc(100vh - 60px); }
+
+        /* 왼쪽: 실험 과정 패널 */
+        .left-panel { flex: 1.2; background: white; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: flex; flex-direction: column; padding: 15px; overflow-y: auto; }
+        .step-title { font-size: 1.2rem; font-weight: bold; color: #34495e; border-bottom: 2px solid #3498db; padding-bottom: 10px; margin-bottom: 15px; }
+        
+        .step-container { flex-grow: 1; display: flex; flex-direction: column; }
+        .step-box { background: #e8f4f8; padding: 20px; border-radius: 8px; display: none; text-align: center; border: 2px solid #bce0fd; }
+        .step-box.active { display: block; animation: fadeIn 0.5s; }
+        .step-desc { margin-bottom: 15px; font-size: 1.05rem; font-weight: bold; color: #2980b9; word-break: keep-all; }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 악기 버튼 디자인 */
+        .btn-group { margin-bottom: 20px; }
+        .instrument-btn { padding: 12px 18px; font-size: 1rem; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; margin: 5px; background: #ecf0f1; border: 2px solid #bdc3c7; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .instrument-btn:hover { background: #d5dbdb; }
+        .instrument-btn.active-play { background: #f1c40f; border-color: #f39c12; color: #d35400; transform: scale(1.05); box-shadow: 0 4px 8px rgba(243,156,18,0.3); }
+        .kalimba-btn { background: #d7ccc8; border-color: #8d6e63; }
+        .recorder-btn { background: #e0f7fa; border-color: #00bcd4; }
+        
+        /* 퀴즈 영역 (단계별 내부에 포함) */
+        .mini-quiz { background: #fff; padding: 15px; border-radius: 8px; border: 2px dashed #9b59b6; margin-top: 20px; display: none; animation: fadeIn 0.5s; }
+        .mini-quiz p { font-size: 1rem; font-weight: bold; color: #8e44ad; margin-bottom: 10px; }
+        .options { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+        .option-label { font-size: 0.95rem; cursor: pointer; display: flex; align-items: center; gap: 8px; background: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 5px; transition: background 0.2s; }
+        .option-label:hover { background: #eaf2f8; }
+        input[type="radio"] { cursor: pointer; width: 18px; height: 18px; accent-color: #3498db; }
+        .option-label.correct-bg { background: #d5f5e3; border-color: #2ecc71; font-weight: bold; color: #27ae60; }
+        .option-label.wrong-bg { background: #fadbd8; border-color: #e74c3c; color: #c0392b; }
+        
+        .feedback { font-size: 0.9rem; font-weight: bold; margin-top: 10px; display: none; }
+        .feedback.correct { color: #27ae60; display: block; }
+        .feedback.wrong { color: #c0392b; display: block; }
+
+        .next-btn { margin-top: 15px; padding: 12px 25px; font-size: 1.1rem; background: #27ae60; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; display: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); animation: fadeIn 0.5s; }
+        .next-btn:hover { background: #2ecc71; transform: translateY(-2px); }
+
+        /* 오른쪽: 기기 패널 (오실로스코프 전체 차지) */
+        .right-panel { flex: 1; display: flex; flex-direction: column; }
+        
+        /* 오실로스코프 (스마트 기기) */
+        .device-container { flex: 1; background: #333; border-radius: 15px; padding: 15px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); border: 4px solid #7f8c8d; position: relative; display: flex; flex-direction: column; }
+        .device-header { color: #2ecc71; font-weight: bold; font-family: monospace; text-align: center; margin-bottom: 10px; font-size: 1.2rem; }
+        .canvas-wrap { flex-grow: 1; background: #000; border-radius: 8px; position: relative; overflow: hidden; border: 1px solid #555; }
+        canvas { display: block; width: 100%; height: 100%; }
+        .grid-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(46, 204, 113, 0.2) 1px, transparent 1px), linear-gradient(90deg, rgba(46, 204, 113, 0.2) 1px, transparent 1px); background-size: 30px 30px; pointer-events: none; }
+        
+        /* 기기 상태 표시 오버레이 */
+        .screen-off { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #111; display: flex; justify-content: center; align-items: center; color: white; font-size: 1.5rem; z-index: 5; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>🎵 소리의 3요소 가상 실험</h1>
+        <button class="reset-btn" onclick="resetExperiment()">처음으로 ↺</button>
+    </header>
+
+    <main>
+        <!-- 왼쪽: 실험 조작부 -->
+        <section class="left-panel">
+            <div class="step-title" id="step-title">실험 준비</div>
+            
+            <div class="step-container">
+                <!-- Step 1 -->
+                <div class="step-box active" id="step1">
+                    <p class="step-desc">1. 스마트 기기에서 소리 분석 프로그램을 실행하세요.</p>
+                    <button class="instrument-btn" style="background:#3498db; color:white; border:none;" onclick="turnOnDevice()">프로그램 실행하기 🚀</button>
+                </div>
+
+                <!-- Step 2: 소리의 세기 -->
+                <div class="step-box" id="step2">
+                    <p class="step-desc">2. 소리의 세기: 건반을 약하게, 세게 튕겨보며 파동의 '높이'를 관찰하세요.</p>
+                    <div class="btn-group">
+                        <button class="instrument-btn kalimba-btn" onclick="playWave('weak')">약하게 튕기기 (작은 소리)</button>
+                        <button class="instrument-btn kalimba-btn" onclick="playWave('strong')">세게 튕기기 (큰 소리)</button>
+                    </div>
+                    
+                    <div class="mini-quiz" id="quiz2">
+                        <p>📝 확인 퀴즈: 작은 소리와 큰 소리의 파동은 어떤 차이가 있나요?</p>
+                        <div class="options">
+                            <label class="option-label"><input type="radio" name="q2" value="1" onclick="checkAnswer(this, '1', 2)"><span>파동의 진폭(높이)이 다르다.</span></label>
+                            <label class="option-label"><input type="radio" name="q2" value="2" onclick="checkAnswer(this, '1', 2)"><span>파동의 진동수(빽빽함)가 다르다.</span></label>
+                            <label class="option-label"><input type="radio" name="q2" value="3" onclick="checkAnswer(this, '1', 2)"><span>파동의 모양이 다르다.</span></label>
+                        </div>
+                        <div class="feedback" id="fb-q2"></div>
+                        <button class="next-btn" id="next2" onclick="goStep(3)">다음 단계로 ➔</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: 소리의 높낮이 -->
+                <div class="step-box" id="step3">
+                    <p class="step-desc">3. 소리의 높낮이: 긴 건반과 짧은 건반을 튕겨보며 파동의 '빽빽함'을 관찰하세요.</p>
+                    <div class="btn-group">
+                        <button class="instrument-btn kalimba-btn" onclick="playWave('low')">긴 건반 (낮은음)</button>
+                        <button class="instrument-btn kalimba-btn" onclick="playWave('high')">짧은 건반 (높은음)</button>
+                    </div>
+
+                    <div class="mini-quiz" id="quiz3">
+                        <p>📝 확인 퀴즈: 낮은 소리와 높은 소리의 파동은 어떤 차이가 있나요?</p>
+                        <div class="options">
+                            <label class="option-label"><input type="radio" name="q3" value="1" onclick="checkAnswer(this, '2', 3)"><span>파동의 진폭(높이)이 다르다.</span></label>
+                            <label class="option-label"><input type="radio" name="q3" value="2" onclick="checkAnswer(this, '2', 3)"><span>파동의 진동수(빽빽함)가 다르다.</span></label>
+                            <label class="option-label"><input type="radio" name="q3" value="3" onclick="checkAnswer(this, '2', 3)"><span>파동의 모양이 다르다.</span></label>
+                        </div>
+                        <div class="feedback" id="fb-q3"></div>
+                        <button class="next-btn" id="next3" onclick="goStep(4)">다음 단계로 ➔</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: 소리의 맵시 -->
+                <div class="step-box" id="step4">
+                    <p class="step-desc">4. 소리의 맵시(음색): 칼림바와 리코더로 같은 음을 내며 파동의 '모양'을 관찰하세요.</p>
+                    <div class="btn-group">
+                        <button class="instrument-btn kalimba-btn" onclick="playWave('kalimba_c')">칼림바 소리</button>
+                        <button class="instrument-btn recorder-btn" onclick="playWave('recorder_c')">리코더 소리</button>
+                    </div>
+
+                    <div class="mini-quiz" id="quiz4">
+                        <p>📝 확인 퀴즈: 다른 악기로 같은 음을 낼 때 파동은 어떤 차이가 있나요?</p>
+                        <div class="options">
+                            <label class="option-label"><input type="radio" name="q4" value="1" onclick="checkAnswer(this, '3', 4)"><span>파동의 진폭(높이)이 다르다.</span></label>
+                            <label class="option-label"><input type="radio" name="q4" value="2" onclick="checkAnswer(this, '3', 4)"><span>파동의 진동수(빽빽함)가 다르다.</span></label>
+                            <label class="option-label"><input type="radio" name="q4" value="3" onclick="checkAnswer(this, '3', 4)"><span>파동의 모양(파형)이 다르다.</span></label>
+                        </div>
+                        <div class="feedback" id="fb-q4"></div>
+                        <button class="next-btn" id="next4" onclick="finishExperiment()" style="background:#8e44ad;">🎉 실험 완료하기</button>
+                    </div>
+                </div>
+                
+                <!-- 완료 안내 -->
+                <div class="step-box" id="step5">
+                    <h2 style="color:#27ae60; margin-bottom:15px;">🌟 실험 수고하셨습니다!</h2>
+                    <p class="step-desc">소리의 3요소인 <b>세기(진폭), 높낮이(진동수), 맵시(파형)</b>를 완벽하게 학습했습니다.</p>
+                    <button class="reset-btn" style="margin-top:15px; font-size:1.1rem; padding:10px 20px;" onclick="resetExperiment()">처음부터 다시하기</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 오른쪽: 디스플레이 (오실로스코프) -->
+        <section class="right-panel">
+            <div class="device-container">
+                <div class="device-header">SOUND ANALYZER v2.0</div>
+                <div class="canvas-wrap">
+                    <div class="screen-off" id="screen-off">기기 꺼짐 (프로그램을 실행하세요)</div>
+                    <div class="grid-overlay"></div>
+                    <canvas id="waveCanvas"></canvas>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // Web Audio API 설정 (소리 발생기)
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+
+        // 소리 재생 함수
+        function playRealSound(type) {
+            if (!audioCtx) audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const osc = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            osc.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            
+            let freq = 261.63; // 기준 C4 (도)
+            let oscType = 'sine';
+            
+            // 소리 설정 분기
+            if (type === 'weak') {
+                gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); // 볼륨 작게
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+            } else if (type === 'strong') {
+                gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime); // 볼륨 크게
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+            } else if (type === 'low') {
+                freq = 130.81; // C3 (한 옥타브 아래)
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+            } else if (type === 'high') {
+                freq = 523.25; // C5 (한 옥타브 위)
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+            } else if (type === 'kalimba_c') {
+                oscType = 'sine';
+                // 칼림바: 타악기처럼 어택이 강하고 빠르게 줄어듦
+                gainNode.gain.setValueAtTime(0.8, audioCtx.currentTime);
+                gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
+            } else if (type === 'recorder_c') {
+                oscType = 'triangle'; // 리코더: 삼각파에 가까운 부드러운 소리
+                // 관악기처럼 소리가 부드럽게 나고 유지되다 부드럽게 끊김
+                gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.5, audioCtx.currentTime + 0.1);
+                gainNode.gain.setValueAtTime(0.5, audioCtx.currentTime + 0.8);
+                gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 1.2);
+            }
+
+            osc.type = oscType;
+            osc.frequency.value = freq;
+            
+            osc.start();
+            osc.stop(audioCtx.currentTime + 1.5);
+        }
+
+        // 캔버스 설정 (파동 시각화)
+        const canvas = document.getElementById('waveCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        
+        function resizeCanvas() {
+            width = canvas.width = canvas.parentElement.clientWidth;
+            height = canvas.height = canvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        let timeOffset = 0;
+        let isDeviceOn = false;
+        let currentTarget = { amp: 0, freq: 0.05, type: 'sine' }; 
+        let currentDraw = { amp: 0, freq: 0.05, type: 'sine' };   
+        let reqId;
+
+        // 파동 그리기 루프
+        function drawWave() {
+            ctx.clearRect(0, 0, width, height);
+
+            if (isDeviceOn) {
+                currentDraw.amp += (currentTarget.amp - currentDraw.amp) * 0.1;
+                currentDraw.freq += (currentTarget.freq - currentDraw.freq) * 0.1;
+                
+                ctx.beginPath();
+                ctx.strokeStyle = '#2ecc71';
+                ctx.lineWidth = 4;
+                
+                const centerY = height / 2;
+
+                for (let x = 0; x < width; x++) {
+                    let y = 0;
+                    if (currentTarget.type === 'sine') {
+                        y = Math.sin((x * currentDraw.freq) - timeOffset) * currentDraw.amp;
+                    } else if (currentTarget.type === 'complex') {
+                        y = Math.sin((x * currentDraw.freq) - timeOffset) * currentDraw.amp;
+                        y += Math.sin((x * currentDraw.freq * 2) - timeOffset * 2) * (currentDraw.amp * 0.4);
+                        y += Math.sin((x * currentDraw.freq * 3) - timeOffset * 3) * (currentDraw.amp * 0.15);
+                    }
+
+                    if (x === 0) ctx.moveTo(x, centerY - y);
+                    else ctx.lineTo(x, centerY - y);
+                }
+                ctx.stroke();
+                timeOffset += 0.15; 
+            }
+            reqId = requestAnimationFrame(drawWave);
+        }
+
+        // 파동 버튼 클릭 이벤트
+        let playedStates = { step2: 0, step3: 0, step4: 0 };
+
+        function playWave(type) {
+            if(!isDeviceOn) return;
+
+            // 소리 발생
+            playRealSound(type);
+
+            // 버튼 시각 효과
+            event.target.parentElement.querySelectorAll('.instrument-btn').forEach(b => b.classList.remove('active-play'));
+            event.target.classList.add('active-play');
+
+            const maxAmp = height * 0.4; 
+            
+            // 시각 파동 설정 및 단계 진행 체크
+            switch(type) {
+                case 'weak': 
+                    currentTarget = { amp: maxAmp * 0.25, freq: 0.05, type: 'sine' }; 
+                    playedStates.step2 |= 1; break;
+                case 'strong': 
+                    currentTarget = { amp: maxAmp, freq: 0.05, type: 'sine' }; 
+                    playedStates.step2 |= 2; break;
+                
+                case 'low': 
+                    currentTarget = { amp: maxAmp * 0.6, freq: 0.025, type: 'sine' }; 
+                    playedStates.step3 |= 1; break;
+                case 'high': 
+                    currentTarget = { amp: maxAmp * 0.6, freq: 0.08, type: 'sine' }; 
+                    playedStates.step3 |= 2; break;
+                
+                case 'kalimba_c': 
+                    currentTarget = { amp: maxAmp * 0.6, freq: 0.05, type: 'sine' }; 
+                    playedStates.step4 |= 1; break;
+                case 'recorder_c': 
+                    currentTarget = { amp: maxAmp * 0.6, freq: 0.05, type: 'complex' }; 
+                    playedStates.step4 |= 2; break;
+            }
+
+            // 각 단계 버튼을 모두 누르면 하단 퀴즈 표시
+            if(playedStates.step2 === 3) document.getElementById('quiz2').style.display = 'block';
+            if(playedStates.step3 === 3) document.getElementById('quiz3').style.display = 'block';
+            if(playedStates.step4 === 3) document.getElementById('quiz4').style.display = 'block';
+        }
+
+        // --- 퀴즈 정답 확인 로직 ---
+        function checkAnswer(radioBtn, correctVal, stepNum) {
+            const container = radioBtn.closest('.mini-quiz');
+            const labels = container.querySelectorAll('.option-label');
+            const fb = container.querySelector('.feedback');
+            const nextBtn = document.getElementById('next' + stepNum);
+            
+            labels.forEach(lbl => { lbl.classList.remove('correct-bg', 'wrong-bg'); });
+            
+            if(radioBtn.value === correctVal) {
+                // 정답일 때
+                radioBtn.closest('.option-label').classList.add('correct-bg');
+                fb.className = 'feedback correct';
+                fb.innerText = "✅ 정답입니다!";
+                nextBtn.style.display = 'inline-block'; // 다음 단계 버튼 활성화
+                
+                // 꽃가루 효과 실행
+                confetti({
+                    particleCount: 100,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+            } else {
+                // 오답일 때
+                radioBtn.closest('.option-label').classList.add('wrong-bg');
+                fb.className = 'feedback wrong';
+                fb.innerText = "❌ 오답입니다. 실험결과를 다시 확인해보세요.";
+                nextBtn.style.display = 'none';
+            }
+        }
+
+        // --- 실험 단계 제어 ---
+        function hideAllSteps() {
+            document.querySelectorAll('.step-box').forEach(el => el.classList.remove('active'));
+            currentTarget.amp = 0; 
+            document.querySelectorAll('.instrument-btn').forEach(b => b.classList.remove('active-play'));
+        }
+
+        function turnOnDevice() {
+            // AudioContext 정책상 사용자 제스처 후 초기화 권장
+            if (!audioCtx) audioCtx = new AudioContext();
+            
+            isDeviceOn = true;
+            document.getElementById('screen-off').style.display = 'none';
+            goStep(2);
+            if(!reqId) drawWave();
+        }
+
+        function goStep(stepNum) {
+            hideAllSteps();
+            document.getElementById('step' + stepNum).classList.add('active');
+            
+            const titles = ["", "1. 기기 준비", "2. 소리의 세기 (진폭)", "3. 소리의 높낮이 (진동수)", "4. 소리의 맵시 (파형)", "5. 실험 완료"];
+            document.getElementById('step-title').innerText = titles[stepNum];
+        }
+
+        function finishExperiment() {
+            hideAllSteps();
+            goStep(5);
+            currentTarget.amp = 0; 
+            confetti({ particleCount: 200, spread: 100, origin: { y: 0.5 } }); // 큰 축하
+        }
+
+        function resetExperiment() {
+            isDeviceOn = false;
+            document.getElementById('screen-off').style.display = 'flex';
+            
+            currentTarget = { amp: 0, freq: 0.05, type: 'sine' };
+            currentDraw = { amp: 0, freq: 0.05, type: 'sine' };
+            playedStates = { step2: 0, step3: 0, step4: 0 };
+            
+            // 퀴즈 및 버튼 상태 초기화
+            document.querySelectorAll('.mini-quiz').forEach(q => q.style.display = 'none');
+            document.querySelectorAll('.next-btn').forEach(b => b.style.display = 'none');
+            document.querySelectorAll('input[type="radio"]').forEach(r => r.checked = false);
+            document.querySelectorAll('.option-label').forEach(lbl => lbl.classList.remove('correct-bg', 'wrong-bg'));
+            document.querySelectorAll('.feedback').forEach(fb => fb.style.display = 'none');
+
+            goStep(1);
+            document.getElementById('step-title').innerText = "실험 준비";
+        }
+
+        ctx.clearRect(0, 0, width, height);
+
+    </script>
+</body>
+</html>
